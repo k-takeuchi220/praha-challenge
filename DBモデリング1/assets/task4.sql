@@ -1,59 +1,3 @@
-## 課題1
-
-<img src="./assets/task1.png" alt="ER図">
-
-### 補足
-- 注文テーブル
-  - 注文情報が格納される。
-- 注文詳細テーブル
-  - 1つの注文に対し、複数のレコードが格納される。
-- 商品テーブル
-  - 商品ごとのデータが入るマスタテーブル。
-  - カテゴリ1は、「セットメニュー, お好みずし」、カテゴリ2は、「盛り込み, 一皿...」の定数値が入る想定。（検索用）
-  - 商品価格変更時は、新たにレコードを追加し、削除日時を登録する想定。
-- 顧客テーブル
-  - 顧客情報が格納される。
-- 税率区分テーブル
-  - 店内飲食、持ち帰りで税率が変化するため。
-- 税率テーブル
-  - 税率が変化する際に、レコードを追加。
-
----
-## 課題2
-
-課題1にあるOrderDetailテーブルにシャリのサイズを登録するカラムを追加する。
-
-<img src="./assets/task2.png" alt="">
-
-
-特定の商品の売上個数を取得する。
-```
-select sum(count) from order_details where product_id = 1;
-```
-
-お好み寿司内で一番売れている商品情報を取得する。
-```
-select sum(count) as max_count, product_id from order_details where product_id in (select id from products where category1 = 2) group by product_id order by sum(count) desc limit 1;
-```
-
-
----
-## 課題3
-
-自分の考えた追加仕様
-
-> スタンプカードの導入。<br>
-> 1000円以上お買い上げごとにスタンプが押され、10個ごとに500円分のクーポンコードが発行されるようになった。<br>
-> スタンプの有効期限は、1年間。<br>
-> クーポンコード交換後の有効期限は、1ヶ月間となっている。
-
----
-## 課題4
-
-<details><summary>SQL</summary>
-
-
-```rb
 CREATE DATABASE IF NOT EXISTS db_modering1 ;
 use db_modering1;
 
@@ -148,6 +92,3 @@ CREATE TABLE IF NOT EXISTS tax (
 INSERT INTO tax VALUES
   (1, '1000-01-01 00:00:00', '9999-12-31 23:59:59', 1, 100),
   (2, '1000-01-01 00:00:00', '9999-12-31 23:59:59', 2, 80);
-
-```
-</details>
