@@ -56,7 +56,7 @@ select sum(count) as max_count, product_id from order_details where product_id i
 ```rb
 出前の考慮
 住所や郵便番号の追加が必要
-Aamzonで自宅住所以外にも配達ができることを考えると、顧客マスタの住所に届けるとは限らないため実際に届ける住所は注文履歴に持つべきかも
+Amazonで自宅住所以外にも配達ができることを考えると、顧客マスタの住所に届けるとは限らないため実際に届ける住所は注文履歴に持つべきかも
 注文履歴に決済方法があるといいかも
 優待セールで１週間だけ10%オフ（メニューはそのまま）
 ポイントカード
@@ -89,18 +89,44 @@ ex. 飲み物や汁物など
 - 複数のクーポンは、併用不可。
 - セールとクーポンで値引きされる商品は、対象を「全て」「カテゴリごと」「特定の商品」を設定でき、「割引率」と「割引価格」を設定できる。
 
+
 濃い緑: 追加テーブル<br>
 黄色: 追加カラム
 <img src="./assets/task3.png" alt="">
+
+追加部分について
+- 注文テーブル
+  - 配送先ID 設定された配送先一覧から選択された配送先IDが指定。
+  - セールID セール適用の場合に指定　通常時は0。
+  - クーポンID クーポン使用の場合に指定　未使用時は0。
+  - 削除日時　購入取り消し時等に記録 デフォルトnull。
+  - 配送日時　配送完了時に記録。
+- 注文詳細テーブル
+  - 削除日時　購入取り消し時等に記録 デフォルトnull。
+- 配送先テーブル
+  - 概要　顧客が登録している配送先一覧の情報を記録。
+  - 支払い方法　1:現金, 2:クレジットカード等、処理内部に定数を配置する想定。
+- セールテーブル
+  - 概要　セール情報を登録。
+- クーポンテーブル
+  - 概要　顧客ごとのクーポン情報を登録。
+- 割引テーブル
+  - 概要 セール、クーポンの実際に適用されるデータを登録。
+  - 割引金額、割引割合　各データごとに、どちらかのみが使用される想定、使用しない場合は0を指定。
+  - 条件カテゴリ　カテゴリごと割引対象にする場合に指定。使用しない場合は0。
+  - 条件商品ID　特定の商品のみ対象とする場合に指定。使用しない場合は0。
+  - 全ての商品を指定する場合には、条件カテゴリ、条件商品IDを0に設定。
+- スタンプカードテーブル
+  - 概要　顧客ごとのスタンプ（ポイント）カード情報を登録。
+  - 有効期限日時　最後にスタンプを押された日時 + 有効期限日時が記録される想定。
 
 ---
 ## 課題4
 
 <details><summary>SQL</summary>
 
-
 ```rb
-CREATE DATABASE IF NOT EXISTS db_modering1 ;
+CREATE DATABASE IF NOT EXISTS db_modering1;
 use db_modering1;
 
 -- ===== 注文テーブル =====
@@ -110,13 +136,18 @@ CREATE TABLE orders(
     tax_division_id smallint unsigned NOT NULL comment '税率区分ID',
     order_at datetime DEFAULT NULL comment '注文日時',
     is_payment tinyint(1) comment '支払い済みか',
+    shipping_id int unsigned NOT NULL comment '配送先ID',
+    sale_id int unsigned NOT NULL comment 'セールID',
+    coupon_id int unsigned NOT NULL comment 'クーポンID',
+    delete_at datetime DEFAULT NULL comment '削除日時',
+    delivery_at datetime DEFAULT NULL comment '配送日時',
     PRIMARY KEY (id)
 );
 
 INSERT INTO orders VALUES
-  (1, 1, 1, '2022-11-01', 0),
-  (2, 2, 2, '2022-11-02', 1),
-  (3, 3, 3, '2022-11-03', 1);
+  (1, 1, 1, '2022-11-01 12:00', 0, 1, 0, 0, null, null),
+  (2, 2, 2, '2022-11-01 13:05', 1, 1, 1, 0, '2022-11-01 13:10', null),
+  (3, 3, 3, '2022-11-01 13:06', 1, 1, 1, 1, null, '2022-11-01 14:00');
 
 -- ===== 注文詳細テーブル =====
 CREATE TABLE IF NOT EXISTS order_details (
@@ -125,6 +156,7 @@ CREATE TABLE IF NOT EXISTS order_details (
     product_id int unsigned NOT NULL comment '商品ID',
     count tinyint unsigned NOT NULL comment '注文個数',
     is_wasabi tinyint(1) comment 'サビ有りか',
+    delete_at datetime DEFAULT NULL comment '削除日時',
     PRIMARY KEY (id)
 );
 
@@ -170,30 +202,93 @@ INSERT INTO customers VALUES
   (2, '小林 二郎', '090-xxxx-xxxx'),
   (3, '山田 三郎', '090-xxxx-xxxx');
 
--- ===== 税率区分テーブル =====
-CREATE TABLE IF NOT EXISTS tax_divisions (
+-- ===== 税率テーブル =====
+CREATE TABLE IF NOT EXISTS taxes (
     id int unsigned NOT NULL AUTO_INCREMENT,
+    start_at datetime DEFAULT NULL comment '適応開始日時',
+    end_at datetime DEFAULT NULL comment '適応終了日時',
+    tax_division_id smallint comment '消費税区分ID',
+    rate smallint(4) comment '税率（千分率）',
     name varchar(20) comment '税率区分名称',
     PRIMARY KEY (id)
 );
 
-INSERT INTO tax_divisions VALUES
-  (1, '標準税率'),
-  (2, '軽減税率');
+INSERT INTO taxes VALUES
+  (1, null, null, 1, 100, '標準税率'),
+  (2, null, null, 2, 80, '軽減税率');
 
--- ===== 税率テーブル =====
-CREATE TABLE IF NOT EXISTS tax (
+-- ===== 配送先テーブル =====
+CREATE TABLE IF NOT EXISTS shippings (
     id int unsigned NOT NULL AUTO_INCREMENT,
-    start_at datetime NOT NULL comment '適応開始日時',
-    end_at datetime NOT NULL comment '適応終了日時',
-    tax_division_id smallint comment '消費税区分ID',
-    rate smallint(4) comment '税率（千分率）',
+    post_code int(7) NOT NULL comment '郵便番号',
+    address text NOT NULL comment '住所',
+    name varchar(20) comment '配送先名',
+    payment_id int unsigned NOT NULL comment '支払い方法',
+    customer_id int unsigned NOT NULL comment '顧客ID',
     PRIMARY KEY (id)
 );
 
-INSERT INTO tax VALUES
-  (1, '1000-01-01 00:00:00', '9999-12-31 23:59:59', 1, 100),
-  (2, '1000-01-01 00:00:00', '9999-12-31 23:59:59', 2, 80);
+INSERT INTO shippings VALUES
+  (1, 1008111, '東京都千代田区千代田１−１', '皇居', 1, 1),
+  (2, 1000002, '東京都千代田区皇居外苑１−１', '皇居外苑', 2, 1);
+  (3, 1008111, '東京都千代田区千代田１−１', '皇居', 1, 2),
+  (4, 1008111, '東京都千代田区千代田１−１', '皇居', 1, 3);
+
+-- ===== セールテーブル =====
+CREATE TABLE IF NOT EXISTS sales (
+    id int unsigned NOT NULL AUTO_INCREMENT,
+    discount_id int unsigned NOT NULL comment '割引ID',
+    start_at datetime DEFAULT NULL comment '開始日時',
+    end_at datetime DEFAULT NULL comment '終了日時',
+    PRIMARY KEY (id)
+);
+
+INSERT INTO shippings VALUES
+  (1, 1, '2022-11-01 13:00', '2022-11-03 13:00');
+
+-- ===== クーポンテーブル =====
+CREATE TABLE IF NOT EXISTS coupons (
+    id int unsigned NOT NULL AUTO_INCREMENT,
+    discount_id int unsigned NOT NULL comment '割引ID',
+    period_at datetime NOT NULL comment '有効期限',
+    PRIMARY KEY (id)
+);
+
+INSERT INTO coupons VALUES
+  (1, 2, '2022-11-03 13:00'),
+  (2, 3, '2022-11-03 13:00');
+
+-- ===== スタンプカードテーブル =====
+CREATE TABLE IF NOT EXISTS stamp_cards (
+    id int unsigned NOT NULL AUTO_INCREMENT,
+    point int unsigned NOT NULL DEFAULT 0 comment 'ポイント',
+    customer_id int unsigned NOT NULL comment '顧客ID',
+    period_at datetime comment '有効期限',
+    UNIQUE idx_customer_id(customer_id),
+    PRIMARY KEY (id)
+);
+
+INSERT INTO stamp_cards VALUES
+  (1, 200, 1, '2022-12-01 12:00'),
+  (2, 0, 2, null),
+  (3, 100, 3, '2022-12-01 13:06');
+
+-- ===== 割引テーブル =====
+CREATE TABLE IF NOT EXISTS discounts (
+    id int unsigned NOT NULL AUTO_INCREMENT,
+    name varchar(20) comment '割引名称',
+    price smallint unsigned DEFAULT 0 comment '割引価格',
+    rate smallint(3) unsigned DEFAULT 0 comment '割引価格',
+    cound_category1 tinyint unsigned DEFAULT 0 comment '条件カテゴリ1',
+    cound_category2 tinyint unsigned DEFAULT 0 comment '条件カテゴリ2',
+    cound_product_id int unsigned DEFAULT 0 comment '条件商品ID',
+    PRIMARY KEY (id)
+);
+
+INSERT INTO discounts VALUES
+  (1, '大特化セール 50%オフ', 0, 50, 0, 0, 0),
+  (2, '玉子 10円引きクーポン', 10, 0, 0, 0, 1),
+  (3, 'セットメニュー全品 100円引きクーポン', 100, 0, 1, 0, 0);
 
 ```
 </details>
