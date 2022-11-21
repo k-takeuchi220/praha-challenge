@@ -223,7 +223,7 @@ CREATE TABLE IF NOT EXISTS shippings (
     post_code int(7) NOT NULL comment '郵便番号',
     address text NOT NULL comment '住所',
     name varchar(20) comment '配送先名',
-    payment_id int unsigned NOT NULL comment '支払い方法',
+    payment_type int unsigned NOT NULL comment '支払い方法',
     customer_id int unsigned NOT NULL comment '顧客ID',
     PRIMARY KEY (id)
 );
