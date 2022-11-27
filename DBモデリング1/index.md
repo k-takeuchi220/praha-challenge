@@ -28,12 +28,12 @@
 
 特定の商品の売上個数を取得する。
 ```
-select sum(count) from order_details where product_id = 1;
+SELECT SUM(count) FROM order_details WHERE product_id = 1;
 ```
 
 お好み寿司内で一番売れている商品情報を取得する。
 ```
-select sum(count) as max_count, product_id from order_details where product_id in (select id from products where category1 = 2) group by product_id order by sum(count) desc limit 1;
+SELECT SUM(count) AS max_count, product_id FROM order_details WHERE product_id IN (SELECT id FROM products WHERE category1 = 2) GROUP BY product_id order BY SUM(count) DESC LIMIT 1;
 ```
 
 
@@ -123,7 +123,7 @@ ex. 飲み物や汁物など
 ---
 ## 課題4
 
-<details><summary>SQL</summary>
+<details><summary>テスト用SQL</summary>
 
 ```rb
 CREATE DATABASE IF NOT EXISTS db_modering1;
