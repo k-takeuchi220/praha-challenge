@@ -6,8 +6,8 @@
 （ワークスペースは指定不要な認識）
 ```
 SELECT contents FROM messages WHERE channel_id IN (
-  SELECT channel_id FROM user_channels WHERE user_id = {ユーザIDを指定}
-) AND MATCH (contents) AGAINST ('返信');
+  SELECT channel_id FROM user_channels WHERE user_id = 1
+) AND MATCH (contents) AGAINST ('返信' IN BOOLEAN MODE);
 ```
 
 EXPLAIN実行結果
@@ -25,6 +25,8 @@ LIKEで検索文字列前にワイルドカードを使用する場合、イン�
 全文検索の場合は、テーブルを跨いでしまうとインデックスが有効にならないため、スレッドメッセージもメッセージテーブルに格納するようにしております。<br>
 （スレッドメッセージではない場合、thread_idは0が入る想定）
 
+以下のリンクにて、速度検証行いました。<br>
+[速度検証](https://github.com/k-takeuchi220/mysql-fulltext-ngram)
 
 <details><summary>テスト用SQL</summary>
 
